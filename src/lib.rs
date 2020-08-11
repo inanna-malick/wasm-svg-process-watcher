@@ -4,19 +4,21 @@ use std::f64::consts::*;
 use std::time::Duration;
 use yew::services::interval::{IntervalService, IntervalTask};
 use yew::{format::Json, html, Component, ComponentLink, Html, Properties, ShouldRender};
+use std::collections::{HashSet, HashMap};
 
 #[derive(Debug)]
 pub struct State {
     link: ComponentLink<Self>,
     counter: usize,
     interval_task: IntervalTask,
-    clicked: bool,
+    clicked: HashSet<usize>,
+    // process_data: 
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub enum Msg {
     Tick,
-    Click,
+    Click(usize),
 }
 
 impl Component for State {
@@ -24,13 +26,13 @@ impl Component for State {
     type Properties = ();
 
     fn create(arg: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let one_second = Duration::new(0, 5000);
+        let one_second = Duration::new(0, 16000);
         let interval_task = IntervalService::new().spawn(one_second, link.callback(|()| Msg::Tick));
         State {
             interval_task,
             counter: 0,
             link,
-            clicked: false,
+            clicked: HashSet::new(),
         }
     }
 
@@ -41,8 +43,12 @@ impl Component for State {
                 // redraw
                 true
             }
-            _ => {
-                self.clicked = !self.clicked;
+            Msg::Click(id) => {
+                if self.clicked.contains(&id) {
+                    self.clicked.remove(&id);
+                } else {
+                    self.clicked.insert(id);
+                }
                 true
             }
         }
@@ -58,19 +64,19 @@ impl Component for State {
 
         // let cube = mk_cube(&mut iso, t, 0.0, 0.0, 0.0);
 
-        let color = if self.clicked { "#d33682" } else { "#ffffff" };
-
         let grid_size = 10;
 
         let scale = 2.4;
 
         let mut cubes = Vec::new();
 
+        let mut entry = 0;
+
         for x in (-grid_size..grid_size) {
             for y in (-grid_size..grid_size) {
                 // why is this here
                 let d = distance_manhattan(x, y);
-                if (d < 8) {
+                if (d < 4) {
 
                     let x = x as f64;
                     let y = y as f64;
@@ -86,15 +92,21 @@ impl Component for State {
                     // I think this is a faithful translation? lmao idk
                     let dd = if d & 1 > 0 { 1.0 } else { -1.0 };
 
+                    let fake_data = 0.7;
+                    // let fake_data = 0.5 + ((entry as f64) % 3.0);
+
                     let cube = mk_cube(
                         &mut iso,
                         dd * (FRAC_PI_4 - te * FRAC_PI_2),
+                        fake_data, // TODO: actual data source goes here
                         x * scale * 1.42,
                         y * scale * 1.42,
-                        te * 0.5,
+                        0.0,
+                        //te * 0.5,
                     );
 
-                    cubes.push((cube, format!("{:.2}", cubic_input)));
+                    cubes.push((cube, format!("{}", entry), entry));
+                    entry += 1;
                 } else {
                 }
             }
@@ -103,10 +115,11 @@ impl Component for State {
 
         html!{
             <div>
-            <svg viewBox="-100 -50 200 100" xmlns="http://www.w3.org/2000/svg">
-            { for cubes.into_iter().rev().map(|(cube, t)| {
+            <svg viewBox="-100 -75 200 150" xmlns="http://www.w3.org/2000/svg">
+            { for cubes.into_iter().rev().map(|(cube, t, entry)| {
                 // let t = "foo";
-                self.render_cube(cube, color.to_string(), t.to_string())
+
+                self.render_cube(cube, t.to_string(), entry)
             })
             }
             </svg>
@@ -117,17 +130,25 @@ impl Component for State {
 }
 
 impl State {
-    fn render_cube(&self, cube: Cube, color: String, text: String) -> Html {
+    fn render_cube(&self, cube: Cube, text: String, id: usize) -> Html {
         let outer_path = path_to_points(cube.outer_path);
         let inner_path = path_to_points(cube.inner_path);
+        let base_outer_path = path_to_points(cube.base_outer_path);
+        let color = if self.clicked.contains(&id) { "#d33682" } else { "#ffffff" };
 
         html!{
-        <g>
-            <polygon points=outer_path fill=color stroke="black" stroke-width="0.5"
-            onclick=self.link.callback( |_| Msg::Click )
+            <g>
+            <polygon
+                points=base_outer_path fill="#002b36" stroke="black" stroke-width="0.5" opacity="0.7"
+                />
+
+            <polygon
+                points=outer_path fill=color stroke="black" stroke-width="0.5" opacity="0.7"
+            onclick=self.link.callback( move |_| Msg::Click(id) )
             />
-            <polyline points=inner_path fill="none" stroke="black" stroke-width="0.25"
-             onclick=self.link.callback( |_| Msg::Click )
+            <polyline
+                points=inner_path fill="none" stroke="black" stroke-width="0.25" opacity="0.7"
+                onclick=self.link.callback( move |_| Msg::Click(id) )
             />
             <text x=cube.text_anchor.x y=cube.text_anchor.y font-size="2" text-anchor="middle">{ text }</text>
         </g>
@@ -151,10 +172,11 @@ fn path_to_points(path: Vec<Point>) -> String {
 struct Cube {
     inner_path: Vec<Point>,
     outer_path: Vec<Point>,
+    base_outer_path: Vec<Point>,
     text_anchor: Point,
 }
 
-fn mk_cube(iso: &mut Isometric, angle: f64, x: f64, y: f64, z: f64) -> Cube {
+fn mk_cube(iso: &mut Isometric, angle: f64, height: f64, x: f64, y: f64, z: f64) -> Cube {
     let mut angle = angle % FRAC_PI_2;
     if (angle < 0.0) {
         angle += FRAC_PI_2;
@@ -167,7 +189,6 @@ fn mk_cube(iso: &mut Isometric, angle: f64, x: f64, y: f64, z: f64) -> Cube {
     //context.globalAlpha = alpha;
 
     let cube_dim = 0.8;
-    let h = cube_dim;
 
     //11.39,9.20
     //12.94,5.90
@@ -177,13 +198,20 @@ fn mk_cube(iso: &mut Isometric, angle: f64, x: f64, y: f64, z: f64) -> Cube {
     //12.94,11.70
 
     let mut outer_path = Vec::new();
+    outer_path.push(iso.transform(cube_dim, -cube_dim, height));
+    outer_path.push(iso.transform(cube_dim, cube_dim, height));
+    outer_path.push(iso.transform(-cube_dim, cube_dim, height));
+    outer_path.push(iso.transform(-cube_dim, cube_dim, 0.0));
+    outer_path.push(iso.transform(-cube_dim, -cube_dim, 0.0));
+    outer_path.push(iso.transform(cube_dim, -cube_dim, 0.0));
 
-    outer_path.push(iso.transform(cube_dim, -cube_dim, cube_dim));
-    outer_path.push(iso.transform(cube_dim, cube_dim, cube_dim));
-    outer_path.push(iso.transform(-cube_dim, cube_dim, cube_dim));
-    outer_path.push(iso.transform(-cube_dim, cube_dim, -cube_dim));
-    outer_path.push(iso.transform(-cube_dim, -cube_dim, -cube_dim));
-    outer_path.push(iso.transform(cube_dim, -cube_dim, -cube_dim));
+    let mut base_outer_path = Vec::new();
+    base_outer_path.push(iso.transform(cube_dim, -cube_dim, 0.0));
+    base_outer_path.push(iso.transform(cube_dim, cube_dim, 0.0));
+    base_outer_path.push(iso.transform(-cube_dim, cube_dim, 0.0));
+    base_outer_path.push(iso.transform(-cube_dim, cube_dim, -0.2));
+    base_outer_path.push(iso.transform(-cube_dim, -cube_dim, -0.2));
+    base_outer_path.push(iso.transform(cube_dim, -cube_dim, -0.2));
 
     //iso.closePath();
     //context.fill();
@@ -192,12 +220,12 @@ fn mk_cube(iso: &mut Isometric, angle: f64, x: f64, y: f64, z: f64) -> Cube {
 
     //context.beginPath();
     let mut inner_path = Vec::new();
-    inner_path.push(iso.transform(-cube_dim, -cube_dim, cube_dim));
-    inner_path.push(iso.transform(cube_dim, -cube_dim, cube_dim));
-    inner_path.push(iso.transform(-cube_dim, -cube_dim, cube_dim));
-    inner_path.push(iso.transform(-cube_dim, cube_dim, cube_dim));
-    inner_path.push(iso.transform(-cube_dim, -cube_dim, cube_dim));
-    inner_path.push(iso.transform(-cube_dim, -cube_dim, -cube_dim));
+    inner_path.push(iso.transform(-cube_dim, -cube_dim, height));
+    inner_path.push(iso.transform(cube_dim, -cube_dim, height));
+    inner_path.push(iso.transform(-cube_dim, -cube_dim, height));
+    inner_path.push(iso.transform(-cube_dim, cube_dim, height));
+    inner_path.push(iso.transform(-cube_dim, -cube_dim, height));
+    inner_path.push(iso.transform(-cube_dim, -cube_dim, 0.0));
     //context.lineWidth = 0.75;
     //context.stroke();
 
@@ -216,6 +244,7 @@ fn mk_cube(iso: &mut Isometric, angle: f64, x: f64, y: f64, z: f64) -> Cube {
     Cube {
         inner_path,
         outer_path,
+        base_outer_path,
         text_anchor,
     }
 }
