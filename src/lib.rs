@@ -24,7 +24,7 @@ impl Component for State {
     type Properties = ();
 
     fn create(arg: Self::Properties, link: ComponentLink<Self>) -> Self {
-        let one_second = Duration::new(0, 10000);
+        let one_second = Duration::new(0, 5000);
         let interval_task = IntervalService::new().spawn(one_second, link.callback(|()| Msg::Tick));
         State {
             interval_task,
@@ -37,7 +37,7 @@ impl Component for State {
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
             Msg::Tick => {
-                self.counter = (self.counter + 1) % 1000;
+                self.counter = (self.counter + 1) % 500;
                 // redraw
                 true
             }
@@ -52,8 +52,8 @@ impl Component for State {
         let mut iso = Isometric::new();
         iso.scale3d(7.0, 7.0, 7.0);
 
-        let t = self.counter as f64 / 100.0;
-        let t = t % 2.0;
+        let t = self.counter as f64 / 500.0;
+        let t = t * 2.0;
         let t = (-1.0 + t).abs();
 
         // let cube = mk_cube(&mut iso, t, 0.0, 0.0, 0.0);
@@ -62,7 +62,7 @@ impl Component for State {
 
         let grid_size = 10;
 
-        let scale = 2.0;
+        let scale = 2.4;
 
         let mut cubes = Vec::new();
 
@@ -75,7 +75,10 @@ impl Component for State {
                     let x = x as f64;
                     let y = y as f64;
 
-                    let te = cubic_in_out(0.0_f64.max(1.0_f64.min(t * 4.8 - distance_cartesian(x, y) / 5.0)));
+                    let dist_cart = distance_cartesian(x, y);
+                    let cubic_input = 0.0_f64.max(1.0_f64.min((t * 4.8) - (dist_cart / 5.0)));
+                    // TODO: figure out what is causing jitter in cubic_input
+                    let te = cubic_input; //cubic_in_out(cubic_input);
 
                     //if (Math.abs(x) >= innergridsize || Math.abs(y) >= innergridsize) continue;
                     //elems += 1;
@@ -91,7 +94,7 @@ impl Component for State {
                         te * 0.5,
                     );
 
-                    cubes.push((cube, format!("{:.2}", te)));
+                    cubes.push((cube, format!("{:.2}", cubic_input)));
                 } else {
                 }
             }
