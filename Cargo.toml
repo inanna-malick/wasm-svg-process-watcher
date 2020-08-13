@@ -1,11 +1,11 @@
-[package]
-name = "app"
-version = "0.1.0"
-edition = "2018"
+[workspace]
 
-[dependencies]
-anyhow = "1.0"
-serde = "1"
-serde_derive = "1"
-stdweb = "0.4"
-yew = { version = "0.14", features = ["std_web"] }
+members = [
+    "backend",
+    "frontend",
+    "shared-types",
+]
+
+exclude = [
+  "frontend/wasm",
+]
