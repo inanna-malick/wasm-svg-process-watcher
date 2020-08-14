@@ -112,7 +112,7 @@ impl Component for State {
 
         let grid_size = 10;
 
-        let scale = 2.4;
+        let scale = 3.1;
 
         let mut cubes = Vec::new();
 
@@ -204,7 +204,7 @@ impl State {
                 })
 
             }
-            <text x=cube.text_anchor.x y=cube.text_anchor.y font-size="2" text-anchor="middle">{ process_name_2 }</text>
+            <text x=cube.text_anchor.x y=cube.text_anchor.y font-size="3" text-anchor="middle">{ process_name_2 }</text>
         </g>
         }
     }
@@ -266,20 +266,16 @@ fn mk_cube(iso: &mut Isometric, angle: f32, x: f32, y: f32, z: f32, h_percents: 
     iso.translate3d(x, y, z);
     iso.rotate_z(angle - FRAC_PI_4);
 
-    let cube_dim = 0.8;
+    let cube_dim = 1.2;
     let total_height: f32 = h_percents.iter().sum();
     let scaled_height: f32 = 12.0 * cube_dim * total_height;
     let scaled_height = (1.0 + scaled_height).log10();
 
     let height_scaling_factor = scaled_height / total_height;
 
-    // FIXME: HAX?
-    // let height_scaling_factor: f32 = 12.0 * cube_dim * total_height;
-    // let height_scaling_factor = height_scaling_factor.log10();
-    // let height_scaling_factor = total_height / height_scaling_factor;
-    // iso.scale3d(1.0, 1.0, height_scaling_factor);
-
-    // TODO: scale via scale3d(1.0, 1.0, scaling_factor) instead
+    // Hexagon points equation, found online
+    // let sqrt_three = 3.0.sqrt();
+    //(√3a, 0) (2√3a, a) (2√3a, 3a) (√3a, 4a) (0, 3a) (0, a)
 
     let mut outer_path = Vec::new();
     outer_path.push(iso.transform(cube_dim, -cube_dim, scaled_height));
