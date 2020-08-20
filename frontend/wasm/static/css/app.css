@@ -3,11 +3,52 @@ body {
 	  background: #002b36;
 }
 
-button {
-    background-color: #d33682;
-    color: #002b36;
-    border-radius: 4px;
-    padding: 14px 40px;
-    border: none;
-    font-size: 30px;
+.cube-base {
+    fill: #586e75;
+    stroke: black;
+    stroke-width:0.5;
+    opacity:0.7;
 }
+
+
+.cube-focus polygon {
+    fill:#d33682;
+    stroke:black;
+    stroke-width:0.25;
+    opacity:0.7;
+}
+
+text {
+    fill: #002b36;
+    text-anchor:middle;
+    font: bold 21% sans-serif;
+    font-family: Monospace;
+}
+
+.cube-focus polyline {
+    fill:none;
+    stroke:black;
+    stroke-width:0.25;
+    opacity:0.7;
+}
+
+.cube polygon {
+    fill:#93a1a1;
+    stroke:black;
+    stroke-width:0.5;
+    opacity:0.7;
+}
+
+.cube polyline {
+    fill:none;
+    stroke:black;
+    stroke-width:0.25;
+    opacity:0.7;
+}
+
+.grid-container {
+    display: inline-grid;
+    grid-template-columns: 2fr 1fr;
+    grid-gap: 20px;
+}
+

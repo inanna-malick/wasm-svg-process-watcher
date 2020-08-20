@@ -66,23 +66,21 @@ impl Component for State {
                     self.animation_interval_task = None;
                 }
 
-                // redraw
                 true
             }
             Msg::Update => {
                 let task = fetch(&mut self.fetch_service, &self.link);
                 self.fetch_task = Some(task);
 
-                // no need to redraw
                 false
             }
             Msg::HandleUpdateResp(resp) => {
                 self.fetch_task = None;
                 self.process_map = resp.process_map;
                 let animation_interval_task = IntervalService::new()
-                    .spawn(Duration::new(0, 32000), self.link.callback(|()| Msg::Tick));
+                    .spawn(Duration::new(0, 16000), self.link.callback(|()| Msg::Tick));
                 self.animation_interval_task = Some(animation_interval_task);
-                self.animation_counter = 15;
+                self.animation_counter = 45;
                 true
             }
             Msg::Click(name) => {
@@ -101,14 +99,53 @@ impl Component for State {
     }
 
     fn view(&self) -> Html {
+        html! {
+            <div class="grid-container">
+            { self.render_cubes_svg() }
+            { self.render_selected_info() }
+            </div>
+        }
+    }
+}
+
+impl State {
+    fn render_selected_info(&self) -> Html {
+        match &self.focus {
+            Some(focus) => {
+                let group = self.process_map.get(focus).unwrap(); // FIXME - edge cases around updating
+                html! {
+                    <div class="grid-element"> {
+                        for group.iter().map(|process_info| {
+                            // let t = "foo";
+                            html! {
+                                <div>
+                                    <span> { format!("pid: {:?}", process_info.pid) } </span>
+                                    <ul>
+                                    <li> { format!("mem: {:.3}%", process_info.mem_percent) } </li>
+                                    <li> { format!("cpu: {:.3}%", process_info.cpu_percent) } </li>
+                                    <li> { format!("cmd: {}", process_info.cmd_line) } </li>
+                                    </ul>
+                                </div>
+                            }
+                        })
+                    }
+                    </div>
+                }
+            }
+            None => {
+                html! {
+                    <div> { "select a process group to view details" } </div>
+                }
+            }
+        }
+    }
+
+    fn render_cubes_svg(&self) -> Html {
         let mut iso = Isometric::new();
         iso.scale3d(7.0, 7.0, 7.0);
 
-        let t = self.animation_counter as f32 / 15.0;
+        let t = self.animation_counter as f32 / 45.0;
         let t = t * FRAC_PI_2 + FRAC_PI_4;
-        // let t = t * 2.0;
-        // let t = (-1.0 + t).abs();
-        // let t = 0.5;
 
         let grid_size = 10;
 
@@ -136,17 +173,6 @@ impl Component for State {
                     let y = y as f32;
 
                     if let Some((name, process_infos)) = process_info_iter.next() {
-                        // let dist_cart = distance_cartesian(x, y);
-                        // let cubic_input = 0.0_f32.max(1.0_f32.min((t * 4.8) - (dist_cart / 5.0)));
-                        // // TODO: figure out what is causing jitter in cubic_input
-                        // let te = cubic_input; //cubic_in_out(cubic_input);
-
-                        //if (Math.abs(x) >= innergridsize || Math.abs(y) >= innergridsize) continue;
-                        //elems += 1;
-
-                        // I think this is a faithful translation? lmao idk
-                        // let dd = if d & 1 > 0 { 1.0 } else { -1.0 };
-
                         let mem_percents = process_infos.iter().map( |p| p.mem_percent as f32 ).collect();
 
                         let cube = mk_cube(
@@ -169,7 +195,7 @@ impl Component for State {
 
 
         html!{
-            <div>
+            <div class="grid-element">
             <svg viewBox="-100 -75 200 150" xmlns="http://www.w3.org/2000/svg">
             { for cubes.into_iter().rev().map(|(cube, t)| {
                 // let t = "foo";
@@ -178,33 +204,34 @@ impl Component for State {
             })
             }
             </svg>
-            <text>{ format!("t = {:.3}", t) } </text>
             </div>
         }
     }
-}
 
-impl State {
     fn render_cube(&self, cube: Cube, process_name: String) -> Html {
         let outer_path = path_to_points(cube.outer_path);
         let inner_paths: Vec<String> = cube.inner_paths.into_iter().map(path_to_points).collect();
         let base_outer_path = path_to_points(cube.base_outer_path);
-        let color = if self.focus == Some(process_name.clone()) { "#d33682" } else { "#ffffff" };
+        let cube_class = if self.focus == Some(process_name.clone()) { "cube-focus" } else { "cube" };
         let process_name_2 = process_name.clone();
+
+        let text_y_pos = cube.text_anchor.y + 0.75; // hax to reduce clipping - vertical centering
 
         html!{
             <g onclick=self.link.callback( move |_| Msg::Click(process_name.clone()) )>
-            <polygon points=base_outer_path fill="#002b36" stroke="black" stroke-width="0.5" opacity="0.7"/>
-            <polygon points=outer_path fill=color stroke="black" stroke-width="0.5" opacity="0.7"/>
-            {
-                for inner_paths.into_iter().map(|path| {
-                    html!{
-                        <polyline points=path fill="none" stroke="black" stroke-width="0.25" opacity="0.7"/>
-                    }
-                })
+            <g class=cube_class>
+                <polygon class="cube-base" points=base_outer_path />
+                <polygon points=outer_path />
+                {
+                    for inner_paths.into_iter().map(|path| {
+                        html!{
+                            <polyline points=path />
+                        }
+                    })
 
-            }
-            <text x=cube.text_anchor.x y=cube.text_anchor.y font-size="3" text-anchor="middle">{ process_name_2 }</text>
+                }
+            </g>
+            <text x=cube.text_anchor.x y=text_y_pos >{ process_name_2 }</text>
         </g>
         }
     }
@@ -266,7 +293,7 @@ fn mk_cube(iso: &mut Isometric, angle: f32, x: f32, y: f32, z: f32, h_percents: 
     iso.translate3d(x, y, z);
     iso.rotate_z(angle - FRAC_PI_4);
 
-    let cube_dim = 1.2;
+    let cube_dim = 1.25;
     let total_height: f32 = h_percents.iter().sum();
     let scaled_height: f32 = 12.0 * cube_dim * total_height;
     let scaled_height = (1.0 + scaled_height).log10();
@@ -333,26 +360,8 @@ fn mk_cube(iso: &mut Isometric, angle: f32, x: f32, y: f32, z: f32, h_percents: 
     }
 }
 
-fn distance_cartesian(x: f32, y: f32) -> f32 {
-    return (x * x + y * y).sqrt();
-}
-
-// distance from (0,0), I think
-// TODO: might be usize?
 fn distance_manhattan(x: isize, y: isize) -> isize {
     x.abs() + y.abs()
-}
-
-// ((t *= 2) <= 1 ? t * t * t : (t -= 2) * t * t + 2) / 2
-fn cubic_in_out(t: f32) -> f32 {
-    let t = t * 2.0;
-    let x = if t <= 1.0 {
-        t * t * t
-    } else {
-        let t = t - 2.0;
-        (t * t * t + 2.0) / 2.0
-    };
-    x
 }
 
 struct Isometric {
